@@ -1,5 +1,7 @@
 qr_rank(R; rank_atol = default_pullback_rank_atol(R)) =
-    @something findlast(>=(rank_atol) ∘ abs, diagview(R)) 0
+    # @something findlast(>=(rank_atol) ∘ abs, diagview(R)) 0
+    # p = count(x -> abs(x) ≥ rank_atol, Rd)
+    p = count(x -> abs(x) ≥ rank_atol, diagview(R))
 
 function check_qr_cotangents(
         Q, R, ΔQ, ΔR, p::Int;
@@ -99,10 +101,23 @@ function qr_pullback!(
         Md = diagview(M)
         Md .= real.(Md)
     end
-    rdiv!(M, R₁₁') # R₁₁ is upper triangular
-    rdiv!(ΔQ̃, R₁₁')
+
+    # CPU original code
+    # rdiv!(M, R₁₁') # R₁₁ is upper triangular
+    # rdiv!(ΔQ̃, R₁₁')
+    # CUDA friendly alternative
+    tmp = similar(M')
+    copyto!(tmp, M')
+    ldiv!(R₁₁, tmp)
+    copyto!(M, tmp')  
+    tmp = similar(ΔQ̃')
+    copyto!(tmp, ΔQ̃')
+    ldiv!(R₁₁, tmp)
+    copyto!(ΔQ̃, tmp')
+    
     ΔA₁ = mul!(ΔA₁, Q₁, M, +1, 1)
     ΔA₁ .+= ΔQ̃
+
     return ΔA
 end
 
